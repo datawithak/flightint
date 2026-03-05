@@ -172,8 +172,6 @@ export default function Home() {
     ? vessels.filter((v) => filters.region === "global" || v.region === filters.region)
     : [];
 
-  const isTestMode = useTestFlights || useTestVessels;
-
   return (
     <div className="flex flex-col h-screen bg-gray-950 text-white overflow-hidden">
       {/* Top bar */}
@@ -184,14 +182,16 @@ export default function Home() {
         </div>
 
         <div className="ml-auto flex items-center gap-3">
-          {isTestMode && (
-            <span className="text-amber-400 text-xs bg-amber-400/10 border border-amber-400/30 px-2 py-0.5 rounded">
-              TEST DATA
-            </span>
-          )}
-          {(flightError || vesselError) && (
-            <span className="text-red-400 text-xs truncate max-w-xs" title={flightError ?? vesselError ?? ""}>
-              &#9888; {flightError ?? vesselError}
+          {/* Separate live/demo indicators per layer */}
+          <span className={`text-xs px-2 py-0.5 rounded border ${useTestFlights ? "text-amber-400 bg-amber-400/10 border-amber-400/30" : "text-green-400 bg-green-400/10 border-green-400/30"}`}>
+            ✈ {useTestFlights ? "demo" : "live"}
+          </span>
+          <span className={`text-xs px-2 py-0.5 rounded border ${useTestVessels ? "text-amber-400 bg-amber-400/10 border-amber-400/30" : "text-green-400 bg-green-400/10 border-green-400/30"}`}>
+            ⚓ {useTestVessels ? "demo" : "live"}
+          </span>
+          {vesselError && (
+            <span className="text-red-400 text-xs truncate max-w-xs" title={vesselError}>
+              &#9888; {vesselError}
             </span>
           )}
 
