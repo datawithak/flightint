@@ -75,7 +75,7 @@ export default function Home() {
         setUseTestFlights(data.aircraft.length === 0);
       }
     } catch {
-      setFlightError("Live flights unavailable — showing demo data");
+      setFlightError("Flight feed unreachable");
       setAircraft(TEST_AIRCRAFT);
     } finally {
       setFlightLoading(false);

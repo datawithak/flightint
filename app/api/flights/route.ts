@@ -11,11 +11,7 @@ export async function GET(req: NextRequest) {
     const aircraft = await fetchMilitaryFlights(region);
     return NextResponse.json({ aircraft, fetchedAt: Date.now() });
   } catch (err) {
-    const raw = err instanceof Error ? err.message : "Unknown error";
-    // OpenSky blocks cloud/datacenter IPs — surface a clean message
-    const message = raw.includes("fetch failed") || raw.includes("ECONNREFUSED")
-      ? "OpenSky unavailable from cloud — showing demo data"
-      : raw;
+    const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message, aircraft: [] }, { status: 200 });
   }
 }

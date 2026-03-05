@@ -1,39 +1,81 @@
-import { Aircraft, OpenSkyResponse, RegionKey } from "@/types/flight";
+import { Aircraft, RegionKey } from "@/types/flight";
 import { REGIONS } from "@/constants/regions";
-import { parseOpenSkyState } from "./military-filter";
+import { getCallsignType } from "@/constants/military";
 
-const BASE_URL = "https://opensky-network.org/api/states/all";
+// adsb.fi — free, no API key, community ADS-B feeders, no cloud IP blocking
+// /v1/mil returns all military aircraft globally (~150-300 at any time)
+const ADSB_FI_URL = "https://api.adsb.fi/v1/mil";
 
-export async function fetchMilitaryFlights(region: RegionKey): Promise<Aircraft[]> {
-  const bounds = REGIONS[region].bounds;
-  const params = new URLSearchParams({
-    lamin: bounds.lat_min.toString(),
-    lomin: bounds.lon_min.toString(),
-    lamax: bounds.lat_max.toString(),
-    lomax: bounds.lon_max.toString(),
-  });
+interface AdsbFiAircraft {
+  hex: string;
+  flight?: string;
+  lat?: number;
+  lon?: number;
+  alt_baro?: number | "ground";
+  gs?: number;       // knots
+  track?: number;    // degrees true
+  baro_rate?: number; // ft/min
+  squawk?: string;
+}
 
-  const url = `${BASE_URL}?${params.toString()}`;
+interface AdsbFiResponse {
+  ac: AdsbFiAircraft[];
+  now: number;
+  total: number;
+}
 
-  const res = await fetch(url, {
-    next: { revalidate: 30 }, // cache for 30s — OpenSky rate limits unauthenticated to 10 req/min
-    headers: {
-      "Accept": "application/json",
-    },
-  });
+function parseAdsbFiAircraft(raw: AdsbFiAircraft, region: RegionKey): Aircraft | null {
+  if (raw.lat == null || raw.lon == null) return null;
 
-  if (!res.ok) {
-    if (res.status === 429) throw new Error("OpenSky rate limit hit — try again in 60s");
-    throw new Error(`OpenSky API error: ${res.status}`);
+  // Filter to region bounding box (adsb.fi returns global, we slice)
+  if (region !== "global") {
+    const b = REGIONS[region].bounds;
+    if (raw.lat < b.lat_min || raw.lat > b.lat_max ||
+        raw.lon < b.lon_min || raw.lon > b.lon_max) return null;
   }
 
-  const data: OpenSkyResponse = await res.json();
+  const callsign = (raw.flight ?? "").trim();
+  const onGround = raw.alt_baro === "ground" || raw.alt_baro === 0;
+  const altFt = typeof raw.alt_baro === "number" ? raw.alt_baro : null;
 
-  if (!data.states) return [];
+  return {
+    icao24: raw.hex,
+    callsign,
+    origin_country: "",
+    time_position: null,
+    last_contact: Date.now() / 1000,
+    longitude: raw.lon,
+    latitude: raw.lat,
+    baro_altitude: altFt != null ? altFt * 0.3048 : null,  // ft → m (app stores meters)
+    on_ground: onGround,
+    velocity: raw.gs != null ? raw.gs * 0.514444 : null,   // knots → m/s
+    true_track: raw.track ?? null,
+    vertical_rate: raw.baro_rate != null ? raw.baro_rate * 0.00508 : null, // ft/min → m/s
+    sensors: null,
+    geo_altitude: null,
+    squawk: raw.squawk ?? null,
+    spi: false,
+    position_source: 0,
+    isMilitary: true,
+    aircraftType: getCallsignType(callsign),
+    region,
+  };
+}
+
+export async function fetchMilitaryFlights(region: RegionKey): Promise<Aircraft[]> {
+  const res = await fetch(ADSB_FI_URL, {
+    next: { revalidate: 30 },
+    headers: { "Accept": "application/json", "User-Agent": "FlightInt/1.0" },
+  });
+
+  if (!res.ok) throw new Error(`ADSB.fi returned ${res.status}`);
+
+  const data: AdsbFiResponse = await res.json();
+  if (!data.ac?.length) return [];
 
   const aircraft: Aircraft[] = [];
-  for (const state of data.states) {
-    const parsed = parseOpenSkyState(state);
+  for (const raw of data.ac) {
+    const parsed = parseAdsbFiAircraft(raw, region);
     if (parsed) aircraft.push(parsed);
   }
 
