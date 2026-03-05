@@ -85,14 +85,16 @@ All data is **publicly broadcast** — no scraping, no paid APIs, no classified 
 
 ---
 
-## Watchlist callsigns
+## Watchlist callsigns — what to look out for
 
-| Prefix | Mission |
-|---|---|
-| RIVET / JAKE | SIGINT — electronic eavesdropping & radar mapping |
-| SENTRY | AWACS — airborne early warning & battle management |
-| NIGHTW | COMMAND — doomsday command aircraft |
-| SPAR / SAM | VIP — senior government/military transport |
-| FORTE / HAWK | UAV — high-altitude surveillance drones |
-| LAGR / NCHO | TANKER — aerial refueling |
-| PETRO | STRIKE — B-2 bomber refueling ops |
+Military aircraft use radio callsigns instead of flight numbers. Certain callsign prefixes are associated with specific high-value missions. When FlightInt detects one of these, it triggers a 🎯 alert with a pulsing red ring on the map.
+
+| Callsign | What it is | Why it matters |
+|---|---|---|
+| **RIVET / JAKE** | Spy plane | Flies along borders to listen to enemy radar, communications, and missile systems without entering their airspace |
+| **SENTRY** | Flying radar tower | A Boeing 707 with a giant radar dish on top — it can see every aircraft for hundreds of miles and coordinate an air battle in real time |
+| **NIGHTWATCH** | Doomsday plane | A specially hardened Boeing 747 that can survive a nuclear war and keep the US command chain alive if the ground is destroyed. Rarely flies — when it does, people notice. |
+| **SPAR / SAM** | VIP transport | Carries the President, Vice President, Secretary of Defense, or other senior officials. SAM stands for Special Air Mission. |
+| **FORTE / HAWK** | High-altitude drone | Unmanned aircraft that can loiter at extreme altitude for days, watching a target area below |
+| **LAGR / NCHO** | Aerial tanker | A flying gas station — it extends the range of fighters and bombers by refueling them mid-air. Seeing tankers active usually means strike aircraft are nearby. |
+| **PETRO** | Tanker linked to B-2 bombers | Same job as above, but this callsign is specifically associated with refueling B-2 stealth bombers during strike operations |
