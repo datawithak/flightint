@@ -21,6 +21,8 @@ export interface Aircraft {
   isMilitary: boolean;
   aircraftType: AircraftType;
   region?: RegionKey;
+  isWatchlisted?: boolean;
+  watchlistTooltip?: string;
 }
 
 export type AircraftType =
@@ -83,6 +85,13 @@ export type OpenSkyState = [
   boolean,          // 15: spi
   number            // 16: position_source
 ];
+
+export interface Geofence {
+  lat_min: number;
+  lat_max: number;
+  lon_min: number;
+  lon_max: number;
+}
 
 export interface OpenSkyResponse {
   time: number;

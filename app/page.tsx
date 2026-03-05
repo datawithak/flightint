@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { Aircraft, FlightFilters, RegionKey } from "@/types/flight";
+import { Aircraft, FlightFilters, Geofence, RegionKey } from "@/types/flight";
 import { Vessel } from "@/types/vessel";
 import { IntelFeedResult } from "@/types/intel";
 import { filterAircraft } from "@/lib/military-filter";
@@ -29,34 +29,38 @@ const DEFAULT_FILTERS: FlightFilters = {
 };
 
 const FLIGHT_REFRESH_MS = 30_000;
-const VESSEL_REFRESH_MS = 60_000;  // AIS updates ~1/min
-const INTEL_REFRESH_MS  = 300_000; // 5 min
+const VESSEL_REFRESH_MS = 60_000;
+const INTEL_REFRESH_MS  = 300_000;
 
 export default function Home() {
   // ── Filters ───────────────────────────────────────────────────
   const [filters, setFilters] = useState<FlightFilters>(DEFAULT_FILTERS);
 
+  // ── Geofence ──────────────────────────────────────────────────
+  const [geofence, setGeofence]   = useState<Geofence | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
   // ── Aircraft state ────────────────────────────────────────────
-  const [aircraft, setAircraft]       = useState<Aircraft[]>(TEST_AIRCRAFT);
+  const [aircraft, setAircraft]               = useState<Aircraft[]>(TEST_AIRCRAFT);
   const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
   const [flightLoading, setFlightLoading]     = useState(false);
   const [flightError, setFlightError]         = useState<string | null>(null);
   const [lastFlightUpdate, setLastFlightUpdate] = useState<number | null>(null);
-  const [useTestFlights, setUseTestFlights]   = useState(true); // flips false once live data arrives
+  const [useTestFlights, setUseTestFlights]   = useState(true);
   const flightIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Vessel state ──────────────────────────────────────────────
-  const [vessels, setVessels]         = useState<Vessel[]>(TEST_VESSELS);
+  const [vessels, setVessels]                 = useState<Vessel[]>(TEST_VESSELS);
   const [selectedVesselMmsi, setSelectedVesselMmsi] = useState<string | null>(null);
-  const [vesselLoading, setVesselLoading]   = useState(false);
-  const [vesselError, setVesselError]       = useState<string | null>(null);
-  const [useTestVessels, setUseTestVessels] = useState(true); // flips false once live data arrives
+  const [vesselLoading, setVesselLoading]     = useState(false);
+  const [vesselError, setVesselError]         = useState<string | null>(null);
+  const [useTestVessels, setUseTestVessels]   = useState(true);
   const vesselIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Intel state ───────────────────────────────────────────────
-  const [intelResult, setIntelResult] = useState<IntelFeedResult | null>(null);
-  const [intelLoading, setIntelLoading]   = useState(false);
-  const [intelError, setIntelError]       = useState<string | null>(null);
+  const [intelResult, setIntelResult]   = useState<IntelFeedResult | null>(null);
+  const [intelLoading, setIntelLoading] = useState(false);
+  const [intelError, setIntelError]     = useState<string | null>(null);
   const intelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Fetch flights ─────────────────────────────────────────────
@@ -120,57 +124,53 @@ export default function Home() {
     }
   }, []);
 
-  // ── Auto-fetch + auto-refresh: aircraft ──────────────────────
-  // Runs on mount and whenever region changes. No button click needed.
+  // ── Auto-fetch + auto-refresh ─────────────────────────────────
   useEffect(() => {
     fetchFlights(filters.region);
     flightIntervalRef.current = setInterval(() => fetchFlights(filters.region), FLIGHT_REFRESH_MS);
     return () => { if (flightIntervalRef.current) clearInterval(flightIntervalRef.current); };
   }, [filters.region, fetchFlights]);
 
-  // ── Auto-fetch + auto-refresh: vessels ────────────────────────
   useEffect(() => {
     fetchVessels(filters.region);
     vesselIntervalRef.current = setInterval(() => fetchVessels(filters.region), VESSEL_REFRESH_MS);
     return () => { if (vesselIntervalRef.current) clearInterval(vesselIntervalRef.current); };
   }, [filters.region, fetchVessels]);
 
-  // ── Auto-refresh: intel (always on) ──────────────────────────
   useEffect(() => {
     fetchIntel(filters.region);
     intelIntervalRef.current = setInterval(() => fetchIntel(filters.region), INTEL_REFRESH_MS);
     return () => { if (intelIntervalRef.current) clearInterval(intelIntervalRef.current); };
   }, [filters.region, fetchIntel]);
 
-  // ── Deselect both when region changes ────────────────────────
+  // ── Handlers ──────────────────────────────────────────────────
   const handleFilterChange = (f: FlightFilters) => {
     setFilters(f);
     setSelectedAircraftId(null);
     setSelectedVesselMmsi(null);
   };
-
-  // Selecting one clears the other
-  const handleSelectAircraft = (a: Aircraft) => {
-    setSelectedAircraftId(a.icao24);
-    setSelectedVesselMmsi(null);
-  };
-  const handleSelectVessel = (v: Vessel) => {
-    setSelectedVesselMmsi(v.mmsi);
-    setSelectedAircraftId(null);
-  };
-  const handleDeselect = () => {
-    setSelectedAircraftId(null);
-    setSelectedVesselMmsi(null);
-  };
+  const handleSelectAircraft = (a: Aircraft) => { setSelectedAircraftId(a.icao24); setSelectedVesselMmsi(null); };
+  const handleSelectVessel   = (v: Vessel)   => { setSelectedVesselMmsi(v.mmsi);   setSelectedAircraftId(null); };
+  const handleDeselect       = ()            => { setSelectedAircraftId(null);       setSelectedVesselMmsi(null); };
 
   // ── Filtered data ─────────────────────────────────────────────
   const visibleAircraft = filters.showAircraft
-    ? filterAircraft(aircraft, filters.region, filters.aircraftType, filters.showGrounded)
+    ? filterAircraft(aircraft, filters.region, filters.aircraftType, filters.showGrounded, geofence)
     : [];
 
   const visibleVessels = filters.showVessels
-    ? vessels.filter((v) => filters.region === "global" || v.region === filters.region)
+    ? vessels.filter((v) => {
+        if (geofence) {
+          if (v.latitude  < geofence.lat_min || v.latitude  > geofence.lat_max) return false;
+          if (v.longitude < geofence.lon_min || v.longitude > geofence.lon_max) return false;
+          return true;
+        }
+        return filters.region === "global" || v.region === filters.region;
+      })
     : [];
+
+  // ── Watchlist alerts (visible aircraft only) ──────────────────
+  const alerts = visibleAircraft.filter((a) => a.isWatchlisted);
 
   return (
     <div className="flex flex-col h-screen bg-gray-950 text-white overflow-hidden">
@@ -182,7 +182,11 @@ export default function Home() {
         </div>
 
         <div className="ml-auto flex items-center gap-3">
-          {/* Separate live/demo indicators per layer */}
+          {alerts.length > 0 && (
+            <span className="text-red-400 text-xs bg-red-400/10 border border-red-400/30 px-2 py-0.5 rounded animate-pulse font-semibold">
+              🎯 {alerts.length} ALERT{alerts.length !== 1 ? "S" : ""}
+            </span>
+          )}
           <span className={`text-xs px-2 py-0.5 rounded border ${useTestFlights ? "text-amber-400 bg-amber-400/10 border-amber-400/30" : "text-green-400 bg-green-400/10 border-green-400/30"}`}>
             ✈ {useTestFlights ? "demo" : "live"}
           </span>
@@ -194,13 +198,8 @@ export default function Home() {
               &#9888; {vesselError}
             </span>
           )}
-
-          {/* Manual refresh */}
           <button
-            onClick={() => {
-              fetchFlights(filters.region);
-              fetchVessels(filters.region);
-            }}
+            onClick={() => { fetchFlights(filters.region); fetchVessels(filters.region); }}
             disabled={flightLoading || vesselLoading}
             className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-3 py-1 rounded transition-colors"
           >
@@ -215,6 +214,10 @@ export default function Home() {
         onChange={handleFilterChange}
         aircraftCount={visibleAircraft.length}
         vesselCount={visibleVessels.length}
+        geofence={geofence}
+        isDrawing={isDrawing}
+        onStartDraw={() => setIsDrawing(true)}
+        onClearGeofence={() => { setGeofence(null); setIsDrawing(false); }}
       />
 
       {/* Main layout */}
@@ -222,6 +225,7 @@ export default function Home() {
         <Sidebar
           aircraft={visibleAircraft}
           vessels={visibleVessels}
+          alerts={alerts}
           selectedAircraftId={selectedAircraftId}
           selectedVesselMmsi={selectedVesselMmsi}
           onSelectAircraft={handleSelectAircraft}
@@ -243,8 +247,12 @@ export default function Home() {
             selectedAircraftId={selectedAircraftId}
             selectedVesselMmsi={selectedVesselMmsi}
             region={filters.region}
+            geofence={geofence}
+            isDrawing={isDrawing}
             onSelectAircraft={handleSelectAircraft}
             onSelectVessel={handleSelectVessel}
+            onGeofenceSet={(g) => { setGeofence(g); setIsDrawing(false); }}
+            onDrawingDone={() => setIsDrawing(false)}
           />
         </main>
       </div>

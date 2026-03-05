@@ -9,12 +9,14 @@ import FlightList from "./FlightList";
 import FlightDetail from "./FlightDetail";
 import VesselDetail from "./VesselDetail";
 import IntelFeed from "./IntelFeed";
+import AlertsPanel from "./AlertsPanel";
 
-type Tab = "aircraft" | "vessels" | "intel";
+type Tab = "alerts" | "aircraft" | "vessels" | "intel";
 
 interface Props {
   aircraft: Aircraft[];
   vessels: Vessel[];
+  alerts: Aircraft[];
   selectedAircraftId: string | null;
   selectedVesselMmsi: string | null;
   onSelectAircraft: (a: Aircraft) => void;
@@ -30,13 +32,13 @@ interface Props {
 }
 
 export default function Sidebar({
-  aircraft, vessels,
+  aircraft, vessels, alerts,
   selectedAircraftId, selectedVesselMmsi,
   onSelectAircraft, onSelectVessel, onDeselect,
   loading, vesselLoading, lastUpdated,
   intelResult, intelLoading, intelError, onIntelRefresh,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("aircraft");
+  const [tab, setTab] = useState<Tab>("alerts");
 
   const selectedAircraft = aircraft.find((a) => a.icao24 === selectedAircraftId) ?? null;
   const selectedVessel   = vessels.find((v) => v.mmsi === selectedVesselMmsi) ?? null;
@@ -64,28 +66,50 @@ export default function Sidebar({
 
       {/* Tabs */}
       <div className="flex border-b border-gray-800 shrink-0">
-        {(["aircraft", "vessels", "intel"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`flex-1 py-2 text-xs font-medium transition-colors relative ${
-              tab === t ? "text-white" : "text-gray-500 hover:text-gray-300"
-            }`}
-          >
-            {t === "aircraft" && `✈ ${aircraft.length > 0 ? aircraft.length : ""}`}
-            {t === "vessels"  && `⚓ ${vessels.length > 0 ? vessels.length : ""}`}
-            {t === "intel"    && `📡 ${intelResult?.items.length ?? ""}`}
-            {tab === t && (
-              <div className={`absolute bottom-0 left-0 right-0 h-px ${
-                t === "aircraft" ? "bg-blue-500" :
-                t === "vessels"  ? "bg-orange-500" : "bg-yellow-500"
-              }`} />
-            )}
-          </button>
-        ))}
+        <button
+          onClick={() => setTab("alerts")}
+          className={`flex-1 py-2 text-xs font-medium transition-colors relative ${
+            tab === "alerts"
+              ? alerts.length > 0 ? "text-red-400" : "text-white"
+              : alerts.length > 0 ? "text-red-500 hover:text-red-400" : "text-gray-500 hover:text-gray-300"
+          }`}
+        >
+          🎯 {alerts.length > 0 ? alerts.length : ""}
+          {tab === "alerts" && (
+            <div className={`absolute bottom-0 left-0 right-0 h-px ${alerts.length > 0 ? "bg-red-500" : "bg-white/30"}`} />
+          )}
+        </button>
+
+        <button onClick={() => setTab("aircraft")}
+          className={`flex-1 py-2 text-xs font-medium transition-colors relative ${tab === "aircraft" ? "text-white" : "text-gray-500 hover:text-gray-300"}`}
+        >
+          ✈ {aircraft.length > 0 ? aircraft.length : ""}
+          {tab === "aircraft" && <div className="absolute bottom-0 left-0 right-0 h-px bg-blue-500" />}
+        </button>
+
+        <button onClick={() => setTab("vessels")}
+          className={`flex-1 py-2 text-xs font-medium transition-colors relative ${tab === "vessels" ? "text-white" : "text-gray-500 hover:text-gray-300"}`}
+        >
+          ⚓ {vessels.length > 0 ? vessels.length : ""}
+          {tab === "vessels" && <div className="absolute bottom-0 left-0 right-0 h-px bg-orange-500" />}
+        </button>
+
+        <button onClick={() => setTab("intel")}
+          className={`flex-1 py-2 text-xs font-medium transition-colors relative ${tab === "intel" ? "text-white" : "text-gray-500 hover:text-gray-300"}`}
+        >
+          📡 {intelResult?.items.length ?? ""}
+          {tab === "intel" && <div className="absolute bottom-0 left-0 right-0 h-px bg-yellow-500" />}
+        </button>
       </div>
 
-      {/* Tab content */}
+      {tab === "alerts" && (
+        <AlertsPanel
+          alerts={alerts}
+          selectedId={selectedAircraftId}
+          onSelect={handleSelectAircraft}
+        />
+      )}
+
       {tab === "aircraft" && (
         <>
           {lastUpdated && (
@@ -97,7 +121,6 @@ export default function Sidebar({
             ? <FlightDetail aircraft={selectedAircraft} onClose={onDeselect} />
             : <FlightList aircraft={aircraft} selectedId={selectedAircraftId} onSelect={handleSelectAircraft} />
           }
-          {/* Legend */}
           <div className="mt-auto border-t border-gray-800 px-4 py-3 shrink-0">
             <div className="text-gray-600 text-xs mb-1.5 uppercase tracking-wider">Aircraft</div>
             <div className="grid grid-cols-2 gap-1">
@@ -125,18 +148,17 @@ export default function Sidebar({
             ? <VesselDetail vessel={selectedVessel} onClose={onDeselect} />
             : <VesselList vessels={vessels} selectedMmsi={selectedVesselMmsi} onSelect={handleSelectVessel} />
           }
-          {/* Navy legend */}
           <div className="mt-auto border-t border-gray-800 px-4 py-3 shrink-0">
             <div className="text-gray-600 text-xs mb-1.5 uppercase tracking-wider">Navies</div>
             <div className="grid grid-cols-2 gap-1">
               {(Object.entries(NAVY_CONFIG) as [string, { label: string; color: string; flag: string }][])
                 .filter(([k]) => k !== "other")
                 .map(([key, cfg]) => (
-                <div key={key} className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: cfg.color }} />
-                  <span className="text-gray-400 text-xs truncate">{cfg.flag} {cfg.label}</span>
-                </div>
-              ))}
+                  <div key={key} className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: cfg.color }} />
+                    <span className="text-gray-400 text-xs truncate">{cfg.flag} {cfg.label}</span>
+                  </div>
+                ))}
             </div>
           </div>
         </>
@@ -154,11 +176,7 @@ export default function Sidebar({
   );
 }
 
-// ── Inline vessel list (small, no separate file needed) ──────────────────────
-
-function VesselList({
-  vessels, selectedMmsi, onSelect,
-}: {
+function VesselList({ vessels, selectedMmsi, onSelect }: {
   vessels: Vessel[];
   selectedMmsi: string | null;
   onSelect: (v: Vessel) => void;
@@ -175,7 +193,6 @@ function VesselList({
       </div>
     );
   }
-
   return (
     <div className="overflow-y-auto flex-1">
       {vessels.map((v) => {
@@ -188,18 +205,11 @@ function VesselList({
               v.mmsi === selectedMmsi ? "bg-gray-800 border-l-2 border-l-orange-500" : ""
             }`}
           >
-            <div
-              className="w-2.5 h-2.5 shrink-0 rounded-sm"
-              style={{ backgroundColor: cfg.color }}
-              title={cfg.label}
-            />
+            <div className="w-2.5 h-2.5 shrink-0 rounded-sm" style={{ backgroundColor: cfg.color }} />
             <div className="min-w-0">
-              <div className="text-white text-xs font-mono font-semibold truncate">
-                {v.name}
-              </div>
+              <div className="text-white text-xs font-mono font-semibold truncate">{v.name}</div>
               <div className="text-gray-500 text-xs truncate">
-                {cfg.flag} {v.vesselCategory}
-                {v.speed !== null ? ` · ${v.speed.toFixed(0)} kts` : ""}
+                {cfg.flag} {v.vesselCategory}{v.speed !== null ? ` · ${v.speed.toFixed(0)} kts` : ""}
               </div>
             </div>
           </button>

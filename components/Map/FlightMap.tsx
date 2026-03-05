@@ -3,18 +3,19 @@
 import { useEffect } from "react";
 import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { Aircraft, RegionKey } from "@/types/flight";
+import { Aircraft, Geofence, RegionKey } from "@/types/flight";
 import { Vessel } from "@/types/vessel";
 import { REGION_CENTER, REGION_ZOOM } from "@/constants/regions";
 import AircraftMarker from "./AircraftMarker";
 import VesselMarker from "./VesselMarker";
+import GeofenceLayer from "./GeofenceLayer";
 
 import L from "leaflet";
 delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconUrl:       "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl:     "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
 function RecenterMap({ region }: { region: RegionKey }) {
@@ -31,18 +32,20 @@ interface Props {
   selectedAircraftId: string | null;
   selectedVesselMmsi: string | null;
   region: RegionKey;
+  geofence: Geofence | null;
+  isDrawing: boolean;
   onSelectAircraft: (a: Aircraft) => void;
   onSelectVessel: (v: Vessel) => void;
+  onGeofenceSet: (g: Geofence) => void;
+  onDrawingDone: () => void;
 }
 
 export default function FlightMap({
-  aircraft,
-  vessels,
-  selectedAircraftId,
-  selectedVesselMmsi,
-  region,
-  onSelectAircraft,
-  onSelectVessel,
+  aircraft, vessels,
+  selectedAircraftId, selectedVesselMmsi,
+  region, geofence, isDrawing,
+  onSelectAircraft, onSelectVessel,
+  onGeofenceSet, onDrawingDone,
 }: Props) {
   return (
     <MapContainer
@@ -59,7 +62,13 @@ export default function FlightMap({
       />
       <RecenterMap region={region} />
 
-      {/* Vessels render first (below aircraft) */}
+      <GeofenceLayer
+        geofence={geofence}
+        isDrawing={isDrawing}
+        onGeofenceSet={onGeofenceSet}
+        onDrawingDone={onDrawingDone}
+      />
+
       {vessels.map((v) => (
         <VesselMarker
           key={v.mmsi}
@@ -69,7 +78,6 @@ export default function FlightMap({
         />
       ))}
 
-      {/* Aircraft render on top */}
       {aircraft.map((a) => (
         <AircraftMarker
           key={a.icao24}

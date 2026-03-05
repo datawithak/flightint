@@ -1,6 +1,7 @@
 import { Aircraft, RegionKey } from "@/types/flight";
 import { REGIONS } from "@/constants/regions";
 import { getCallsignType } from "@/constants/military";
+import { matchWatchlist } from "@/constants/watchlist";
 
 // adsb.fi — free, no API key, community ADS-B feeders, no cloud IP blocking
 // /v1/mil returns all military aircraft globally (~150-300 at any time)
@@ -37,6 +38,7 @@ function parseAdsbFiAircraft(raw: AdsbFiAircraft, region: RegionKey): Aircraft |
   const callsign = (raw.flight ?? "").trim();
   const onGround = raw.alt_baro === "ground" || raw.alt_baro === 0;
   const altFt = typeof raw.alt_baro === "number" ? raw.alt_baro : null;
+  const watchlistTooltip = matchWatchlist(callsign) ?? undefined;
 
   return {
     icao24: raw.hex,
@@ -46,11 +48,11 @@ function parseAdsbFiAircraft(raw: AdsbFiAircraft, region: RegionKey): Aircraft |
     last_contact: Date.now() / 1000,
     longitude: raw.lon,
     latitude: raw.lat,
-    baro_altitude: altFt != null ? altFt * 0.3048 : null,  // ft → m (app stores meters)
+    baro_altitude: altFt != null ? altFt * 0.3048 : null,
     on_ground: onGround,
-    velocity: raw.gs != null ? raw.gs * 0.514444 : null,   // knots → m/s
+    velocity: raw.gs != null ? raw.gs * 0.514444 : null,
     true_track: raw.track ?? null,
-    vertical_rate: raw.baro_rate != null ? raw.baro_rate * 0.00508 : null, // ft/min → m/s
+    vertical_rate: raw.baro_rate != null ? raw.baro_rate * 0.00508 : null,
     sensors: null,
     geo_altitude: null,
     squawk: raw.squawk ?? null,
@@ -59,6 +61,8 @@ function parseAdsbFiAircraft(raw: AdsbFiAircraft, region: RegionKey): Aircraft |
     isMilitary: true,
     aircraftType: getCallsignType(callsign),
     region,
+    isWatchlisted: !!watchlistTooltip,
+    watchlistTooltip,
   };
 }
 

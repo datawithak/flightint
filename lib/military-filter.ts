@@ -1,4 +1,4 @@
-import { Aircraft, AircraftType, OpenSkyState, RegionKey } from "@/types/flight";
+import { Aircraft, AircraftType, Geofence, OpenSkyState, RegionKey } from "@/types/flight";
 import {
   isICAOMilitary,
   isMilitaryCallsign,
@@ -79,12 +79,21 @@ export function filterAircraft(
   aircraft: Aircraft[],
   region: RegionKey,
   type: AircraftType | "all",
-  showGrounded: boolean
+  showGrounded: boolean,
+  geofence?: Geofence | null,
 ): Aircraft[] {
   return aircraft.filter((a) => {
     if (!showGrounded && a.on_ground) return false;
     if (type !== "all" && a.aircraftType !== type) return false;
-    if (region !== "global" && a.region !== region) return false;
+
+    if (geofence) {
+      // Geofence overrides region filter
+      if (a.latitude == null || a.longitude == null) return false;
+      if (a.latitude  < geofence.lat_min || a.latitude  > geofence.lat_max) return false;
+      if (a.longitude < geofence.lon_min || a.longitude > geofence.lon_max) return false;
+    } else {
+      if (region !== "global" && a.region !== region) return false;
+    }
     return true;
   });
 }
