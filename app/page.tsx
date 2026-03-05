@@ -75,7 +75,7 @@ export default function Home() {
         setUseTestFlights(data.aircraft.length === 0);
       }
     } catch {
-      setFlightError("OpenSky unreachable");
+      setFlightError("Live flights unavailable — showing demo data");
       setAircraft(TEST_AIRCRAFT);
     } finally {
       setFlightLoading(false);
