@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Aircraft } from "@/types/flight";
 import { Vessel } from "@/types/vessel";
 import { IntelFeedResult } from "@/types/intel";
@@ -29,6 +29,9 @@ interface Props {
   intelLoading: boolean;
   intelError: string | null;
   onIntelRefresh: () => void;
+  defaultTab?: Tab;
+  className?: string;
+  onClose?: () => void;
 }
 
 export default function Sidebar({
@@ -37,8 +40,13 @@ export default function Sidebar({
   onSelectAircraft, onSelectVessel, onDeselect,
   loading, vesselLoading, lastUpdated,
   intelResult, intelLoading, intelError, onIntelRefresh,
+  defaultTab, className, onClose,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("alerts");
+  const [tab, setTab] = useState<Tab>(defaultTab ?? "alerts");
+
+  useEffect(() => {
+    if (defaultTab) setTab(defaultTab);
+  }, [defaultTab]);
 
   const selectedAircraft = aircraft.find((a) => a.icao24 === selectedAircraftId) ?? null;
   const selectedVessel   = vessels.find((v) => v.mmsi === selectedVesselMmsi) ?? null;
@@ -47,19 +55,30 @@ export default function Sidebar({
   const handleSelectVessel   = (v: Vessel)   => { setTab("vessels");  onSelectVessel(v); };
 
   return (
-    <aside className="w-72 bg-gray-950 border-r border-gray-800 flex flex-col h-full shrink-0">
+    <aside className={className ?? "w-72 bg-gray-950 border-r border-gray-800 flex flex-col h-full shrink-0"}>
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between shrink-0">
         <div>
           <div className="text-white font-bold text-sm tracking-wide">FLIGHTINT</div>
           <div className="text-gray-500 text-xs">Military Tracker</div>
         </div>
-        <div className="flex items-center gap-1.5">
-          {loading       && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"   title="Fetching aircraft" />}
-          {vesselLoading && <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" title="Fetching vessels" />}
-          {intelLoading  && <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" title="Fetching intel" />}
-          {!loading && !vesselLoading && !intelLoading && (
-            <div className="w-2 h-2 rounded-full bg-green-500" />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            {loading       && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"   title="Fetching aircraft" />}
+            {vesselLoading && <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" title="Fetching vessels" />}
+            {intelLoading  && <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" title="Fetching intel" />}
+            {!loading && !vesselLoading && !intelLoading && (
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+            )}
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-white text-lg leading-none"
+              title="Close"
+            >
+              ✕
+            </button>
           )}
         </div>
       </div>

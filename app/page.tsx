@@ -32,6 +32,8 @@ const FLIGHT_REFRESH_MS = 30_000;
 const VESSEL_REFRESH_MS = 60_000;
 const INTEL_REFRESH_MS  = 300_000;
 
+type MobileTab = "alerts" | "aircraft" | "vessels" | "intel";
+
 export default function Home() {
   // ── Filters ───────────────────────────────────────────────────
   const [filters, setFilters] = useState<FlightFilters>(DEFAULT_FILTERS);
@@ -62,6 +64,10 @@ export default function Home() {
   const [intelLoading, setIntelLoading] = useState(false);
   const [intelError, setIntelError]     = useState<string | null>(null);
   const intelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Mobile panel state ────────────────────────────────────────
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const [mobileActiveTab, setMobileActiveTab] = useState<MobileTab>("alerts");
 
   // ── Fetch flights ─────────────────────────────────────────────
   const fetchFlights = useCallback(async (region: RegionKey) => {
@@ -149,9 +155,34 @@ export default function Home() {
     setSelectedAircraftId(null);
     setSelectedVesselMmsi(null);
   };
-  const handleSelectAircraft = (a: Aircraft) => { setSelectedAircraftId(a.icao24); setSelectedVesselMmsi(null); };
-  const handleSelectVessel   = (v: Vessel)   => { setSelectedVesselMmsi(v.mmsi);   setSelectedAircraftId(null); };
-  const handleDeselect       = ()            => { setSelectedAircraftId(null);       setSelectedVesselMmsi(null); };
+
+  const openMobilePanel = (tab: MobileTab) => {
+    if (mobilePanelOpen && mobileActiveTab === tab) {
+      setMobilePanelOpen(false);
+    } else {
+      setMobileActiveTab(tab);
+      setMobilePanelOpen(true);
+    }
+  };
+
+  const handleSelectAircraft = (a: Aircraft) => {
+    setSelectedAircraftId(a.icao24);
+    setSelectedVesselMmsi(null);
+    setMobileActiveTab("aircraft");
+    setMobilePanelOpen(true);
+  };
+
+  const handleSelectVessel = (v: Vessel) => {
+    setSelectedVesselMmsi(v.mmsi);
+    setSelectedAircraftId(null);
+    setMobileActiveTab("vessels");
+    setMobilePanelOpen(true);
+  };
+
+  const handleDeselect = () => {
+    setSelectedAircraftId(null);
+    setSelectedVesselMmsi(null);
+  };
 
   // ── Filtered data ─────────────────────────────────────────────
   const visibleAircraft = filters.showAircraft
@@ -169,32 +200,51 @@ export default function Home() {
       })
     : [];
 
-  // ── Watchlist alerts (visible aircraft only) ──────────────────
+  // ── Watchlist alerts ──────────────────────────────────────────
   const alerts = visibleAircraft.filter((a) => a.isWatchlisted);
+
+  // ── Shared sidebar props ──────────────────────────────────────
+  const sidebarProps = {
+    aircraft: visibleAircraft,
+    vessels: visibleVessels,
+    alerts,
+    selectedAircraftId,
+    selectedVesselMmsi,
+    onSelectAircraft: handleSelectAircraft,
+    onSelectVessel: handleSelectVessel,
+    onDeselect: handleDeselect,
+    loading: flightLoading,
+    vesselLoading,
+    lastUpdated: lastFlightUpdate,
+    intelResult,
+    intelLoading,
+    intelError,
+    onIntelRefresh: () => fetchIntel(filters.region),
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-950 text-white overflow-hidden">
       {/* Top bar */}
-      <header className="bg-gray-950 border-b border-gray-800 px-4 py-2 flex items-center gap-4 shrink-0 z-10">
+      <header className="bg-gray-950 border-b border-gray-800 px-3 md:px-4 py-2 flex items-center gap-2 md:gap-4 shrink-0 z-10">
         <div className="flex items-center gap-2">
           <span className="text-blue-400 font-bold tracking-widest text-sm">&#9992; FLIGHTINT</span>
-          <span className="text-gray-600 text-xs">/ military tracker</span>
+          <span className="text-gray-600 text-xs hidden sm:inline">/ military tracker</span>
         </div>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2">
           {alerts.length > 0 && (
             <span className="text-red-400 text-xs bg-red-400/10 border border-red-400/30 px-2 py-0.5 rounded animate-pulse font-semibold">
-              🎯 {alerts.length} ALERT{alerts.length !== 1 ? "S" : ""}
+              🎯 {alerts.length}
             </span>
           )}
           <span className={`text-xs px-2 py-0.5 rounded border ${useTestFlights ? "text-amber-400 bg-amber-400/10 border-amber-400/30" : "text-green-400 bg-green-400/10 border-green-400/30"}`}>
             ✈ {useTestFlights ? "demo" : "live"}
           </span>
-          <span className={`text-xs px-2 py-0.5 rounded border ${useTestVessels ? "text-amber-400 bg-amber-400/10 border-amber-400/30" : "text-green-400 bg-green-400/10 border-green-400/30"}`}>
+          <span className={`hidden sm:inline text-xs px-2 py-0.5 rounded border ${useTestVessels ? "text-amber-400 bg-amber-400/10 border-amber-400/30" : "text-green-400 bg-green-400/10 border-green-400/30"}`}>
             ⚓ {useTestVessels ? "demo" : "live"}
           </span>
           {vesselError && (
-            <span className="text-red-400 text-xs truncate max-w-xs" title={vesselError}>
+            <span className="hidden md:inline text-red-400 text-xs truncate max-w-[8rem]" title={vesselError}>
               &#9888; {vesselError}
             </span>
           )}
@@ -203,7 +253,8 @@ export default function Home() {
             disabled={flightLoading || vesselLoading}
             className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-3 py-1 rounded transition-colors"
           >
-            {(flightLoading || vesselLoading) ? "Fetching..." : "↺ Refresh"}
+            <span className="hidden sm:inline">{(flightLoading || vesselLoading) ? "Fetching..." : "↺ Refresh"}</span>
+            <span className="sm:hidden">{(flightLoading || vesselLoading) ? "…" : "↺"}</span>
           </button>
         </div>
       </header>
@@ -222,25 +273,13 @@ export default function Home() {
 
       {/* Main layout */}
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar
-          aircraft={visibleAircraft}
-          vessels={visibleVessels}
-          alerts={alerts}
-          selectedAircraftId={selectedAircraftId}
-          selectedVesselMmsi={selectedVesselMmsi}
-          onSelectAircraft={handleSelectAircraft}
-          onSelectVessel={handleSelectVessel}
-          onDeselect={handleDeselect}
-          loading={flightLoading}
-          vesselLoading={vesselLoading}
-          lastUpdated={lastFlightUpdate}
-          intelResult={intelResult}
-          intelLoading={intelLoading}
-          intelError={intelError}
-          onIntelRefresh={() => fetchIntel(filters.region)}
-        />
+        {/* Desktop sidebar — hidden on mobile */}
+        <div className="hidden md:flex">
+          <Sidebar {...sidebarProps} />
+        </div>
 
-        <main className="flex-1 relative">
+        {/* Map */}
+        <main className="flex-1 relative pb-14 md:pb-0">
           <FlightMap
             aircraft={visibleAircraft}
             vessels={visibleVessels}
@@ -256,6 +295,72 @@ export default function Home() {
           />
         </main>
       </div>
+
+      {/* Mobile bottom navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-gray-900 border-t border-gray-800 flex">
+        <button
+          onClick={() => openMobilePanel("alerts")}
+          className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors ${
+            mobilePanelOpen && mobileActiveTab === "alerts"
+              ? alerts.length > 0 ? "text-red-400" : "text-white"
+              : alerts.length > 0 ? "text-red-500" : "text-gray-500"
+          }`}
+        >
+          <span className="text-base leading-none">🎯</span>
+          <span className="text-[10px]">{alerts.length > 0 ? `${alerts.length} alert${alerts.length !== 1 ? "s" : ""}` : "Alerts"}</span>
+        </button>
+
+        <button
+          onClick={() => openMobilePanel("aircraft")}
+          className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors ${
+            mobilePanelOpen && mobileActiveTab === "aircraft" ? "text-blue-400" : "text-gray-500"
+          }`}
+        >
+          <span className="text-base leading-none">✈</span>
+          <span className="text-[10px]">{visibleAircraft.length > 0 ? visibleAircraft.length : "Aircraft"}</span>
+        </button>
+
+        <button
+          onClick={() => openMobilePanel("vessels")}
+          className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors ${
+            mobilePanelOpen && mobileActiveTab === "vessels" ? "text-orange-400" : "text-gray-500"
+          }`}
+        >
+          <span className="text-base leading-none">⚓</span>
+          <span className="text-[10px]">{visibleVessels.length > 0 ? visibleVessels.length : "Vessels"}</span>
+        </button>
+
+        <button
+          onClick={() => openMobilePanel("intel")}
+          className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 transition-colors ${
+            mobilePanelOpen && mobileActiveTab === "intel" ? "text-yellow-400" : "text-gray-500"
+          }`}
+        >
+          <span className="text-base leading-none">📡</span>
+          <span className="text-[10px]">{intelResult?.items.length ? intelResult.items.length : "Intel"}</span>
+        </button>
+      </nav>
+
+      {/* Mobile sidebar panel (bottom sheet) */}
+      {mobilePanelOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setMobilePanelOpen(false)}
+          />
+          {/* Sheet */}
+          <div className="relative bg-gray-950 rounded-t-2xl h-[72vh] flex flex-col overflow-hidden border-t border-gray-700">
+            <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto mt-2.5 mb-1 shrink-0" />
+            <Sidebar
+              {...sidebarProps}
+              defaultTab={mobileActiveTab}
+              onClose={() => setMobilePanelOpen(false)}
+              className="w-full bg-gray-950 flex flex-col flex-1 overflow-hidden"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -32,7 +32,7 @@ export default function FilterPanel({
   geofence, isDrawing, onStartDraw, onClearGeofence,
 }: Props) {
   return (
-    <div className="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center gap-4 overflow-x-auto shrink-0">
+    <div className="bg-gray-900 border-b border-gray-700 px-3 md:px-4 py-2 flex items-center gap-3 md:gap-4 overflow-x-auto shrink-0 scrollbar-none" style={{ WebkitOverflowScrolling: "touch" }}>
 
       {/* Region */}
       <div className="flex items-center gap-2 shrink-0">
