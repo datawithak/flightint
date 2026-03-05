@@ -4,7 +4,7 @@ import { getCallsignType } from "@/constants/military";
 
 // adsb.fi — free, no API key, community ADS-B feeders, no cloud IP blocking
 // /v1/mil returns all military aircraft globally (~150-300 at any time)
-const ADSB_FI_URL = "https://api.adsb.fi/v1/mil";
+const ADSB_FI_URL = "https://opendata.adsb.fi/api/v2/mil";
 
 interface AdsbFiAircraft {
   hex: string;
